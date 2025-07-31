@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Intern Capacity Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .icon-btn { border: none; background: none; padding: 0; font-size: 1.2rem; color: #6c757d; cursor: pointer; }
+        .icon-btn:hover { color: #0d6efd; }
+        .icon-group { display: flex; gap: 8px; }
+        .progress { border-radius: 10px; overflow: hidden; }
+        .warning-icon { margin-left: 8px; display: none; }
+        .intern-row { transition: all 0.3s ease; }
+        .no-results { text-align: center; font-style: italic; color: #6c757d; }
+    </style>
+</head>
+<body class="p-4 bg-light">
+<div class="container">
+    <!-- ✅ Tabs Navigation -->
+    <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab">
+                Dashboard
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual" type="button" role="tab">
+                How-To Manual
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <!-- ✅ Dashboard Tab -->
+        <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+            <h1 class="mb-4 text-center">Intern Capacity Dashboard</h1>
+
+            <!-- ✅ Summary Dashboard -->
+            <div class="card shadow p-4 mb-4">
+                <h3 class="mb-3">Intern Capacity Summary</h3>
+                <!-- ✅ Stakeholder Legend -->
+                <div class="d-flex flex-wrap gap-3 mb-3">
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#d63384;margin-right:5px;border-radius:3px;"></span>Government</span>
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#6f42c1;margin-right:5px;border-radius:3px;"></span>Board of Directors</span>
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#0d6efd;margin-right:5px;border-radius:3px;"></span>EXCO</span>
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#20c997;margin-right:5px;border-radius:3px;"></span>IC</span>
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#fd7e14;margin-right:5px;border-radius:3px;"></span>Investors Request</span>
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#198754;margin-right:5px;border-radius:3px;"></span>Public Markets</span>
+                    <span><span style="display:inline-block;width:16px;height:16px;background:#adb5bd;margin-right:5px;border-radius:3px;"></span>Misc</span>
+                </div>
+                <div id="summaryContainer" class="d-flex justify-content-center align-items-end gap-4" style="height:350px; overflow-y:auto;">
+            </div>
+
+            <!-- Search and Filter -->
+            <div class="card shadow p-3 mb-3">
+                <div class="d-flex gap-3 align-items-center">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search by intern name...">
+                    <select id="filterCapacity" class="form-select" style="width: 200px;">
+                        <option value="all">All Interns</option>
+                        <option value="available">Available Slots</option>
+                        <option value="full">Full Capacity</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Intern Table -->
+            <div class="card shadow p-4 mb-4">
+                <h3>Interns</h3>
+                <table class="table table-striped align-middle" id="internTable">
+                    <thead class="table-dark">
+                    <tr>
+                        <th>Name</th>
+                        <th>Capacity (Weighted)</th>
+                        <th>Active Projects</th>
+                        <th>Past Projects</th>
+                        <th></th>
+                    </tr>
+                    </thead>
+                    <tbody id="internTableBody">
+                    {% for intern in interns %}
+                    <tr class="intern-row" data-id="{{ intern.id }}" data-name="{{ intern.name | lower }}">
+                        <td>
+                            <span class="intern-name">{{ intern.name }}</span>
+                            <div class="icon-group ms-2">
+                                <button class="icon-btn edit-intern-btn" data-id="{{ intern.id }}" data-name="{{ intern.name }}" data-bs-toggle="modal" data-bs-target="#editInternModal"><i class="bi bi-pencil"></i></button>
+                                <button class="icon-btn delete-btn" data-id="{{ intern.id }}" data-type="intern"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                {% set score = intern.capacity_score() %}
+                                {% set max_score = intern.max_capacity %}
+                                {% set percentage = (score / max_score) * 100 %}
+                                <div class="progress flex-grow-1" style="height: 25px;">
+                                    <div class="progress-bar {% if score < 50 %}bg-success{% elif score < 100 %}bg-warning{% else %}bg-danger{% endif %}"
+                                        style="width: 100%;">
+                                        {% if score < 50 %}Low{% elif score < 100 %}Moderate{% else %}Overloaded{% endif %}
+                                    </div>
+                                </div>
+                                <span class="warning-icon text-danger ms-2" {% if score > max_score %}style="display:inline;"{% endif %}>
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                </span>
+                            </div>
+                        </td>
+                        <td>
+                            <ul class="active-projects list-unstyled mb-0">
+                                {% for proj in intern.projects if proj.status == 'Active' %}
+                                <li class="d-flex justify-content-between align-items-center mb-1" id="project-{{ proj.id }}">
+                                    <span>{{ proj.project_name }} ({{ proj.stakeholder }}, Supervisor: {{ proj.assigned_by }}, Deadline: {{ proj.deadline if proj.deadline else 'N/A' }})</span>
+                                    <div class="icon-group">
+                                        <button class="icon-btn complete-btn" data-id="{{ proj.id }}"><i class="bi bi-check-circle"></i></button>
+                                        <button class="icon-btn edit-project-btn" data-id="{{ proj.id }}" data-name="{{ proj.project_name }}" data-bs-toggle="modal" data-bs-target="#editProjectModal"><i class="bi bi-pencil"></i></button>
+                                        <button class="icon-btn delete-btn" data-id="{{ proj.id }}" data-type="project"><i class="bi bi-trash"></i></button>
+                                    </div>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm toggle-btn" data-bs-toggle="collapse" data-bs-target="#past-{{ intern.id }}">Show Past Projects</button>
+                            <div id="past-{{ intern.id }}" class="collapse mt-2">
+                                <ul class="mb-0 list-unstyled past-projects">
+                                    {% for proj in intern.projects if proj.status == 'Completed' %}
+                                    <li id="project-{{ proj.id }}" class="d-flex justify-content-between align-items-center mb-1">
+                                        <span>{{ proj.project_name }} ({{ proj.stakeholder }}, Supervisor: {{ proj.assigned_by }})</span>
+                                        <div class="icon-group">
+                                            <button class="icon-btn edit-project-btn" data-id="{{ proj.id }}" data-name="{{ proj.project_name }}" data-bs-toggle="modal" data-bs-target="#editProjectModal"><i class="bi bi-pencil"></i></button>
+                                            <button class="icon-btn delete-btn" data-id="{{ proj.id }}" data-type="project"><i class="bi bi-trash"></i></button>
+                                        </div>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </td>
+                        <td>
+                            <form method="POST" class="assign-form d-flex flex-column gap-2">
+                                <input type="hidden" name="intern_id" value="{{ intern.id }}">
+                                <input type="text" name="project_name" placeholder="Project Name" class="form-control form-control-sm" required>
+                                <select name="assigned_by" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Select Supervisor</option>
+                                    {% for staff in staff_list %}
+                                    <option value="{{ staff }}">{{ staff }}</option>
+                                    {% endfor %}
+                                </select>
+                                <select name="stakeholder" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Select Stakeholder</option>
+                                    <option>Government</option>
+                                    <option>Board of Directors</option>
+                                    <option>EXCO</option>
+                                    <option>IC</option>
+                                    <option>Investors Request</option>
+                                    <option>Public Markets</option>
+                                    <option>Misc</option>
+                                </select>
+                                <input type="date" name="deadline" class="form-control form-control-sm">
+                                <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Add Intern -->
+            <div class="card shadow p-4">
+                <h3>Add New Intern</h3>
+                <form id="addInternForm" method="POST" class="d-flex gap-2">
+                    <input type="text" name="name" placeholder="Intern Name" class="form-control" required>
+                    <button type="submit" class="btn btn-secondary">Add Intern</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- ✅ How-To Manual Tab (INSERT HERE) -->
+        <div class="tab-pane fade" id="manual" role="tabpanel">
+            <div class="card p-4 shadow-lg" style="background:#fff;">
+                <h2 class="text-center mb-4" style="color:#0d6efd;">How to Use Intern Capacity Dashboard</h2>
+                <p class="text-center text-muted mb-4">A quick guide to managing intern workloads effectively</p>
+
+                <!-- Sections 1 to 5 -->
+                <div class="mb-4">
+                    <h4 class="text-primary">1. What is Capacity?</h4>
+                    <p>Capacity measures an intern’s workload using a weighted score: 
+                    <code>Capacity = Σ(Importance × Urgency)</code>. 
+                    It accounts for both project priority and deadline urgency.</p>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="text-primary">2. Stakeholder Weights</h4>
+                    <table class="table table-bordered table-sm text-center">
+                        <thead class="table-dark"><tr><th>Stakeholder</th><th>Weight</th></tr></thead>
+                        <tbody>
+                            <tr><td>Government</td><td>7</td></tr>
+                            <tr><td>Board of Directors</td><td>6</td></tr>
+                            <tr><td>EXCO</td><td>5</td></tr>
+                            <tr><td>IC</td><td>4</td></tr>
+                            <tr><td>Investors Request</td><td>3</td></tr>
+                            <tr><td>Public Markets</td><td>2</td></tr>
+                            <tr><td>Misc</td><td>1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="text-primary">3. Deadline Urgency</h4>
+                    <table class="table table-bordered table-sm text-center">
+                        <thead class="table-dark"><tr><th>Time Left</th><th>Urgency Score</th></tr></thead>
+                        <tbody>
+                            <tr><td>≤ 7 days</td><td>10</td></tr>
+                            <tr><td>≤ 14 days</td><td>9</td></tr>
+                            <tr><td>≤ 30 days</td><td>7</td></tr>
+                            <tr><td>≤ 60 days</td><td>3</td></tr>
+                            <tr><td>> 60 days / None</td><td>1</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="text-primary">4. Load Status</h4>
+                    <ul>
+                        <li><span class="badge bg-success">Low</span>: Score < 50</li>
+                        <li><span class="badge bg-warning text-dark">Moderate</span>: 50–99</li>
+                        <li><span class="badge bg-danger">Overloaded</span>: ≥ 100</li>
+                    </ul>
+                </div>
+
+                <div class="mb-4">
+                    <h4 class="text-primary">5. Quick Tips</h4>
+                    <ul>
+                        <li>Use the <b>Assign Project</b> form to add tasks with stakeholders and deadlines.</li>
+                        <li>The <b>Capacity Summary</b> chart shows bars color-coded by stakeholder type.</li>
+                        <li>Green = Low load, Yellow = Moderate, Red = Overloaded.</li>
+                    </ul>
+                </div>
+
+                <!-- ✅ Example Chart Section -->
+                <div class="mb-4">
+                    <h4 class="text-primary">6. Example Capacity Chart</h4>
+                    <p>This is how workloads are displayed in the summary chart. Each bar represents an intern, and the colors indicate stakeholders:</p>
+                    <div class="d-flex justify-content-center gap-4 mt-3">
+                        <!-- Example Intern 1 -->
+                        <div class="d-flex flex-column align-items-center">
+                            <div style="
+                                display:flex;
+                                flex-direction:column-reverse;
+                                align-items:center;
+                                background:#f8f9fa;
+                                border-radius:8px;
+                                padding:4px;
+                                height:150px;
+                                width:50px;">
+                                <div style="background:#d63384;height:70px;width:100%;border:1px solid #fff;"></div>
+                                <div style="background:#20c997;height:30px;width:100%;border:1px solid #fff;"></div>
+                            </div>
+                            <small class="mt-2 text-center fw-bold">Alice<br><span class="text-muted">Score: 100</span></small>
+                        </div>
+
+                        <!-- Example Intern 2 -->
+                        <div class="d-flex flex-column align-items-center">
+                            <div style="
+                                display:flex;
+                                flex-direction:column-reverse;
+                                align-items:center;
+                                background:#f8f9fa;
+                                border-radius:8px;
+                                padding:4px;
+                                height:150px;
+                                width:50px;">
+                                <div style="background:#6f42c1;height:50px;width:100%;border:1px solid #fff;"></div>
+                                <div style="background:#198754;height:20px;width:100%;border:1px solid #fff;"></div>
+                            </div>
+                            <small class="mt-2 text-center fw-bold">Bob<br><span class="text-muted">Score: 70</span></small>
+                        </div>
+                    </div>
+                    <!-- Color Legend -->
+                    <div class="mt-3">
+                        <h6>Stakeholder Colors:</h6>
+                        <span style="display:inline-block;width:16px;height:16px;background:#d63384;margin-right:6px;border-radius:3px;"></span>Government
+                        <span style="display:inline-block;width:16px;height:16px;background:#6f42c1;margin-left:15px;margin-right:6px;border-radius:3px;"></span>Board of Directors
+                        <span style="display:inline-block;width:16px;height:16px;background:#20c997;margin-left:15px;margin-right:6px;border-radius:3px;"></span>IC
+                        <span style="display:inline-block;width:16px;height:16px;background:#198754;margin-left:15px;margin-right:6px;border-radius:3px;"></span>Public Markets
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+                
+
+<!-- Edit Intern Modal -->
+<div class="modal fade" id="editInternModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editInternForm">
+                <div class="modal-header"><h5>Edit Intern</h5></div>
+                <div class="modal-body">
+                    <input type="hidden" id="editInternId">
+                    <input type="text" id="editInternName" class="form-control" required>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Edit Project Modal -->
+<div class="modal fade" id="editProjectModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="editProjectForm">
+                <div class="modal-header"><h5>Edit Project</h5></div>
+                <div class="modal-body">
+                    <input type="hidden" id="editProjectId">
+                    <input type="text" id="editProjectName" class="form-control" required>
+                </div>
+                <div class="modal-footer"><button type="submit" class="btn btn-primary">Save</button></div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const staffList = {{ staff_list|tojson }};
+    const tableBody = document.getElementById('internTableBody');
+
+    // ✅ Refresh Summary
+    const stakeholderColors = {
+        "Government": "#d63384",         // Pink
+        "Board of Directors": "#6f42c1", // Purple
+        "EXCO": "#0d6efd",               // Blue
+        "IC": "#20c997",                 // Teal
+        "Investors Request": "#fd7e14",  // Orange
+        "Public Markets": "#198754",     // Green
+        "Misc": "#adb5bd"                // Gray
+    };
+
+    function refreshSummary() {
+        fetch('/get_summary')
+            .then(r => r.json())
+            .then(data => {
+                const container = document.getElementById('summaryContainer');
+                container.innerHTML = '';
+
+                // ✅ Auto-scaling logic (PLACE IT HERE)
+                const tallestIntern = Math.max(...data.map(i => i.score)) || 1; 
+                const scaleFactor = 250 / tallestIntern; // tallest bar = 250px height
+
+                // ✅ Build bars dynamically
+                data.forEach(intern => {
+                    const segments = intern.projects.map(proj => `
+                        <div style="
+                            background:${stakeholderColors[proj.stakeholder] || '#6c757d'};
+                            height:${proj.capacity * scaleFactor}px;
+                            width:40px;
+                            border: 1px solid #fff;      /* ✅ White border for separation */
+                            box-sizing: border-box;      /* ✅ Ensures border doesn't affect size */
+                        "
+                        title="${proj.name} (${proj.stakeholder}): ${proj.capacity}">
+                        </div>
+                    `).join('');
+
+                    container.insertAdjacentHTML('beforeend', `
+                        <div class="d-flex flex-column align-items-center" style="width:70px;">
+                            <div style="
+                                display:flex;
+                                flex-direction:column-reverse;
+                                align-items:center;
+                                background:#f8f9fa;
+                                border-radius:8px;
+                                padding:4px;">
+                                ${segments}
+                            </div>
+                            <small class="mt-2 text-center" style="font-size:0.85rem;font-weight:600;">
+                                ${intern.name}<br>
+                                <span style="color:#6c757d;">${intern.score}</span>
+                            </small>
+                        </div>
+                    `);
+                });
+            });
+    }
+
+
+    function updateCapacity(row) {
+        const id = row.dataset.id;
+        fetch(`/get_capacity_score/${id}`)
+            .then(r => r.json())
+            .then(data => {
+                const bar = row.querySelector('.progress-bar');
+                let label;
+                if (data.score < 50) label = 'Low';
+                else if (data.score < 100) label = 'Moderate';
+                else label = 'Overloaded';
+                bar.textContent = label;
+                bar.style.width = '100%';
+                bar.className = `progress-bar ${data.score < 50 ? 'bg-success' : data.score < 100 ? 'bg-warning' : 'bg-danger'}`;
+                row.querySelector('.warning-icon').style.display = data.score >= 100 ? 'inline' : 'none';
+            });
+    }
+
+    function attachButtons() {
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.onclick = function () {
+                const collapseTarget = document.querySelector(btn.dataset.bsTarget);
+                collapseTarget.addEventListener('shown.bs.collapse', () => btn.textContent = 'Hide Past Projects', { once: true });
+                collapseTarget.addEventListener('hidden.bs.collapse', () => btn.textContent = 'Show Past Projects', { once: true });
+            };
+        });
+
+        document.querySelectorAll('.edit-intern-btn').forEach(btn => {
+            btn.onclick = function () {
+                document.getElementById('editInternId').value = this.dataset.id;
+                document.getElementById('editInternName').value = this.dataset.name;
+            };
+        });
+
+        document.querySelectorAll('.edit-project-btn').forEach(btn => {
+            btn.onclick = function () {
+                document.getElementById('editProjectId').value = this.dataset.id;
+                document.getElementById('editProjectName').value = this.dataset.name;
+            };
+        });
+
+        document.querySelectorAll('.delete-btn').forEach(btn => {
+            btn.onclick = function () {
+                const id = this.dataset.id;
+                const type = this.dataset.type;
+                const row = this.closest('tr');
+                if (confirm(`Delete this ${type}?`)) {
+                    fetch(`/delete_${type}/${id}`, { method: 'POST' }).then(r => {
+                        if (r.ok) {
+                            if (type === 'intern') {
+                                row.remove();
+                            } else {
+                                this.closest('li').remove();
+                                updateCapacity(row); // ✅ Update table bar dynamically
+                            }
+                            refreshSummary();
+                            applyFilter();
+                        }
+                    });
+                }
+            };
+        });
+
+        document.querySelectorAll('.complete-btn').forEach(btn => {
+            btn.onclick = function () {
+                const id = this.dataset.id;
+                const row = this.closest('tr');
+                const item = document.getElementById(`project-${id}`);
+                const pastList = row.querySelector('.past-projects');
+
+                const projectName = item.querySelector('span').innerText;
+                const cleanName = projectName.split(' (')[0];
+
+                fetch(`/complete_project/${id}`, { method: 'POST' }).then(r => {
+                    if (r.ok) {
+                        // ✅ Add full HTML structure with edit & delete icons
+                        pastList.insertAdjacentHTML('beforeend', `
+                            <li id="project-${id}" class="d-flex justify-content-between align-items-center mb-1">
+                                <span>${projectName}</span>
+                                <div class="icon-group">
+                                    <button class="icon-btn edit-project-btn" data-id="${id}" data-name="${cleanName}" data-bs-toggle="modal" data-bs-target="#editProjectModal"><i class="bi bi-pencil"></i></button>
+                                    <button class="icon-btn delete-btn" data-id="${id}" data-type="project"><i class="bi bi-trash"></i></button>
+                                </div>
+                            </li>
+                        `);
+                        item.remove(); // ✅ Remove from Active list
+                        updateCapacity(row); // ✅ Update capacity bar
+                        refreshSummary(); // ✅ Refresh summary dashboard
+                        attachButtons(); // ✅ Reattach button events
+                    }
+                });
+            };
+        });
+
+    }
+    attachButtons();
+
+    // ✅ Add Intern dynamically
+    document.getElementById('addInternForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        fetch('/add_intern', { method: 'POST', body: new URLSearchParams(formData) })
+            .then(r => r.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    const newRow = `
+                    <tr class="intern-row" data-id="${data.id}" data-name="${data.name.toLowerCase()}">
+                        <td><span class="intern-name">${data.name}</span>
+                            <div class="icon-group ms-2">
+                                <button class="icon-btn edit-intern-btn" data-id="${data.id}" data-name="${data.name}" data-bs-toggle="modal" data-bs-target="#editInternModal"><i class="bi bi-pencil"></i></button>
+                                <button class="icon-btn delete-btn" data-id="${data.id}" data-type="intern"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="progress flex-grow-1" style="height: 25px;">
+                                    <div class="progress-bar bg-success" style="width:0%">0/35</div>
+                                </div>
+                                <span class="warning-icon text-danger ms-2" style="display:none;">
+                                    <i class="bi bi-exclamation-triangle-fill"></i>
+                                </span>
+                            </div>
+                        </td>
+                        <td><ul class="active-projects list-unstyled mb-0"></ul></td>
+                        <td>
+                            <button class="btn btn-outline-secondary btn-sm toggle-btn" data-bs-toggle="collapse" data-bs-target="#past-${data.id}">Show Past Projects</button>
+                            <div id="past-${data.id}" class="collapse mt-2">
+                                <ul class="past-projects list-unstyled"></ul>
+                            </div>
+                        </td>
+                        <td>
+                            <form class="assign-form d-flex flex-column gap-2">
+                                <input type="hidden" name="intern_id" value="${data.id}">
+                                <input type="text" name="project_name" class="form-control form-control-sm" placeholder="Project Name" required>
+                                <select name="assigned_by" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Select Supervisor</option>
+                                    ${staffList.map(staff => `<option value="${staff}">${staff}</option>`).join('')}
+                                </select>
+                                <select name="stakeholder" class="form-select form-select-sm" required>
+                                    <option value="" disabled selected>Select Stakeholder</option>
+                                    <option>Government</option>
+                                    <option>Board of Directors</option>
+                                    <option>EXCO</option>
+                                    <option>IC</option>
+                                    <option>Investors Request</option>
+                                    <option>Public Markets</option>
+                                    <option>Misc</option>
+                                </select>
+                                <input type="date" name="deadline" class="form-control form-control-sm">
+                                <button type="submit" class="btn btn-primary btn-sm">Assign</button>
+                            </form>
+                        </td>
+                    </tr>`;
+                    tableBody.insertAdjacentHTML('beforeend', newRow);
+                    const addedRow = tableBody.lastElementChild;  // ✅ Grab the newly added row
+                    updateCapacity(addedRow);
+                    attachButtons();
+                    refreshSummary();
+                    applyFilter();
+                    this.reset();
+                }
+            });
+    });
+
+    // ✅ Assign Project dynamically
+    document.addEventListener('submit', function (e) {
+        if (e.target.classList.contains('assign-form')) {
+            e.preventDefault();
+            const form = e.target;
+            const row = form.closest('tr');
+            const formData = new FormData(form);
+            fetch('/assign_project', { method: 'POST', body: new URLSearchParams(formData) })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        row.querySelector('.active-projects').insertAdjacentHTML('beforeend', `
+                            <li class="d-flex justify-content-between align-items-center mb-1" id="project-${data.id}">
+                                <span>${data.name} (${data.stakeholder}, Supervisor: ${data.supervisor}, Deadline: ${data.deadline || 'N/A'})</span>
+                                <div class="icon-group">
+                                    <button class="icon-btn complete-btn" data-id="${data.id}"><i class="bi bi-check-circle"></i></button>
+                                    <button class="icon-btn edit-project-btn" data-id="${data.id}" data-name="${data.name}" data-bs-toggle="modal" data-bs-target="#editProjectModal"><i class="bi bi-pencil"></i></button>
+                                    <button class="icon-btn delete-btn" data-id="${data.id}" data-type="project"><i class="bi bi-trash"></i></button>
+                                </div>
+                            </li>`);
+                        updateCapacity(row);
+                        refreshSummary();
+                        attachButtons();
+                        form.reset();
+                    }
+                });
+        }
+    });
+
+    // ✅ Edit Intern
+    document.getElementById('editInternForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const id = document.getElementById('editInternId').value;
+        const name = document.getElementById('editInternName').value;
+        fetch(`/edit_intern/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `name=${encodeURIComponent(name)}`
+        }).then(r => {
+            if (r.ok) {
+                const btn = document.querySelector(`.edit-intern-btn[data-id="${id}"]`);
+                btn.dataset.name = name;
+                btn.closest('tr').querySelector('.intern-name').textContent = name;
+                bootstrap.Modal.getInstance(document.getElementById('editInternModal')).hide();
+                refreshSummary();
+                applyFilter();
+            }
+        });
+    });
+
+    // ✅ Edit Project
+    document.getElementById('editProjectForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const id = document.getElementById('editProjectId').value;
+        const name = document.getElementById('editProjectName').value;
+        fetch(`/edit_project/${id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `project_name=${encodeURIComponent(name)}`
+        }).then(r => {
+            if (r.ok) {
+                const projectItem = document.querySelector(`#project-${id} span`);
+                if (projectItem) {
+                    const details = projectItem.textContent.includes("(")
+                        ? projectItem.textContent.substring(projectItem.textContent.indexOf(" ("))
+                        : "";
+                    projectItem.textContent = `${name}${details}`;
+                    // ✅ Update data-name on the edit button
+                    const editBtn = document.querySelector(`.edit-project-btn[data-id="${id}"]`);
+                    if (editBtn) {
+                        editBtn.dataset.name = name; // ✅ Keeps it in sync
+                    }
+                }
+                bootstrap.Modal.getInstance(document.getElementById('editProjectModal')).hide();
+            }
+        });
+    });
+
+    // ✅ Filtering
+    function applyFilter() {
+        const searchText = document.getElementById('searchInput').value.toLowerCase();
+        const filterValue = document.getElementById('filterCapacity').value;
+        const rows = document.querySelectorAll('.intern-row');
+        let visibleCount = 0;
+        rows.forEach(row => {
+            const name = row.dataset.name;
+            const [score, max] = row.querySelector('.progress-bar').textContent.split('/');
+            const load = parseInt(score);
+            const maxCap = parseInt(max);
+            let show = true;
+            if (searchText && !name.includes(searchText)) show = false;
+            if (filterValue === 'available' && load >= maxCap) show = false;
+            if (filterValue === 'full' && load < maxCap) show = false;
+            row.style.display = show ? '' : 'none';
+            if (show) visibleCount++;
+        });
+        let noResultRow = document.getElementById('noResultRow');
+        if (!noResultRow) {
+            noResultRow = document.createElement('tr');
+            noResultRow.id = 'noResultRow';
+            noResultRow.innerHTML = `<td colspan="5" class="text-center text-muted">No results found</td>`;
+            document.getElementById('internTableBody').appendChild(noResultRow);
+        }
+        noResultRow.style.display = visibleCount === 0 ? '' : 'none';
+    }
+    document.getElementById('searchInput').addEventListener('input', applyFilter);
+    document.getElementById('filterCapacity').addEventListener('change', applyFilter);
+    refreshSummary();
+});
+</script>
+</body>
+</html>
