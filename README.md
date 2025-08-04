@@ -18,6 +18,7 @@ For Windows:
    a. python -m venv venv
    b. pip install -r requirements.txt
    c. venv\Scripts\activate
+   d. python app.py
 
 Local hosting ID should pop up. It should look something like http://127.0.0.1:5000/.
 Click on the link and you should be able to see the app!
